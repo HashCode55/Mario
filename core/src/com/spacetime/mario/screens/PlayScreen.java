@@ -3,9 +3,11 @@ package com.spacetime.mario.screens;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.ScreenAdapter;
+import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.maps.MapObject;
 import com.badlogic.gdx.maps.objects.RectangleMapObject;
 import com.badlogic.gdx.maps.tiled.TiledMap;
@@ -23,8 +25,10 @@ import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.spacetime.mario.MarioBros;
 import com.spacetime.mario.scenes.Hud;
+import com.spacetime.mario.sprites.Goomba;
 import com.spacetime.mario.sprites.Mario;
 import com.spacetime.mario.tools.Box2DWorldCreator;
+import com.spacetime.mario.tools.WorldContactListener;
 
 /**
  * Created by mehul on 4/13/16.
@@ -35,6 +39,7 @@ public class PlayScreen extends ScreenAdapter{
     private OrthographicCamera camera;
     private Viewport viewport;
     private Hud hud;
+    private TextureAtlas textureAtlas;
 
     //TILED MAP VARIABLES
     //for loading the map
@@ -48,9 +53,14 @@ public class PlayScreen extends ScreenAdapter{
     private Mario mario;
     private Box2DWorldCreator box2DWorldCreator;
 
+    //enemies
+    private Goomba goomba;
+    private Music music;
+
 
     public PlayScreen(MarioBros game){
         this.game = game;
+        textureAtlas = new TextureAtlas("Mario_and_Enemies.pack");
         camera = new OrthographicCamera();
         viewport = new FitViewport(MarioBros.V_WIDTH / MarioBros.PPM, MarioBros.V_HEIGHT / MarioBros.PPM, camera);
         hud = new Hud(game.batch);
@@ -63,11 +73,29 @@ public class PlayScreen extends ScreenAdapter{
         world = new World(new Vector2(0, -10f), true);
         debugRenderer = new Box2DDebugRenderer();
 
-        box2DWorldCreator = new Box2DWorldCreator(world, tiledMap);
+        box2DWorldCreator = new Box2DWorldCreator(this);
 
-        mario = new Mario(world);
+        mario = new Mario(this);
+
+        world.setContactListener(new WorldContactListener());
+
+        music = MarioBros.assetManager.get("audio/music/mario_music.ogg", Music.class);
+        music.setLooping(true);
+        music.play();
+        goomba = new Goomba(this,  0.32f, 0.32f);
     }
 
+    public TextureAtlas getTextureAtlas(){
+        return textureAtlas;
+    }
+
+    public TiledMap getTiledMap(){
+        return tiledMap;
+    }
+
+    public World getWorld(){
+        return world;
+    }
 
     @Override
     public void render(float delta) {
@@ -82,7 +110,11 @@ public class PlayScreen extends ScreenAdapter{
         handleInput(delta);
 
         world.step(delta, 6, 2);
-        camera.position.x = mario.mario.getPosition().x;
+        hud.update(delta);
+        mario.update(delta);
+        goomba.update(delta);
+        if(mario.mario.getPosition().x > viewport.getWorldWidth() / 2)
+            camera.position.x = mario.mario.getPosition().x;
         camera.update();
         orthogonalTiledMapRenderer.setView(camera);
     }
@@ -102,8 +134,14 @@ public class PlayScreen extends ScreenAdapter{
     }
 
     private void draw(){
-        game.batch.setProjectionMatrix(hud.stage.getCamera().combined);
         orthogonalTiledMapRenderer.render();
+
+        game.batch.setProjectionMatrix(camera.combined);
+        game.batch.begin();
+        mario.draw(game.batch);
+        goomba.draw(game.batch);
+        game.batch.end();
+        game.batch.setProjectionMatrix(hud.stage.getCamera().combined);
         hud.stage.draw();
     }
 

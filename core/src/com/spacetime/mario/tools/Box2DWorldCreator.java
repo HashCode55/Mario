@@ -10,6 +10,7 @@ import com.badlogic.gdx.physics.box2d.FixtureDef;
 import com.badlogic.gdx.physics.box2d.PolygonShape;
 import com.badlogic.gdx.physics.box2d.World;
 import com.spacetime.mario.MarioBros;
+import com.spacetime.mario.screens.PlayScreen;
 import com.spacetime.mario.sprites.Brick;
 import com.spacetime.mario.sprites.Coin;
 import com.spacetime.mario.sprites.Mario;
@@ -19,7 +20,10 @@ import com.spacetime.mario.sprites.Mario;
  */
 public class Box2DWorldCreator {
 
-    public Box2DWorldCreator(World world, TiledMap tiledMap){
+    public Box2DWorldCreator(PlayScreen screen){
+
+        World world = screen.getWorld();
+        TiledMap tiledMap = screen.getTiledMap();
 
         BodyDef bodyDef = new BodyDef();
         PolygonShape polygonShape = new PolygonShape();
@@ -50,18 +54,18 @@ public class Box2DWorldCreator {
 
             polygonShape.setAsBox((rectangle.getWidth() / 2) / MarioBros.PPM, (rectangle.getHeight() / 2) / MarioBros.PPM);
             fixtureDef.shape = polygonShape;
-
+            fixtureDef.filter.categoryBits = MarioBros.OBJECT_BIT;
             body.createFixture(fixtureDef);
         }
 
         for(MapObject mapObject : tiledMap.getLayers().get(4).getObjects().getByType(RectangleMapObject.class)){
             Rectangle rectangle = ((RectangleMapObject)mapObject).getRectangle();
-            new Brick(world, tiledMap, rectangle);
+            new Coin(screen, rectangle);
         }
 
         for(MapObject mapObject : tiledMap.getLayers().get(5).getObjects().getByType(RectangleMapObject.class)){
             Rectangle rectangle = ((RectangleMapObject)mapObject).getRectangle();
-            new Coin(world, tiledMap, rectangle);
+            new Brick(screen, rectangle);
         }
     }
 }
