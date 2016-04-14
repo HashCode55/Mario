@@ -1,6 +1,8 @@
-package com.spacetime.mario.sprites;
+package com.spacetime.mario.enemies;
 
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.g2d.Animation;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.BodyDef;
@@ -14,7 +16,7 @@ import com.spacetime.mario.screens.PlayScreen;
 /**
  * Created by mehul on 4/14/16.
  */
-public class Goomba extends Enemy {
+public class Goomba extends com.spacetime.mario.enemies.Enemy {
 
     private float animationTimer;
     private Animation enemyWalk;
@@ -42,17 +44,19 @@ public class Goomba extends Enemy {
             world.destroyBody(enemy);
             destroyed = true;
             setRegion(new TextureRegion(playScreen.getTextureAtlas().findRegion("goomba"), 2 * 16, 0, 16, 16));
+            animationTimer = 0;
         }
         else if(!destroyed) {
             setPosition(enemy.getPosition().x - getWidth() / 2, enemy.getPosition().y - getHeight() / 2);
             setRegion(enemyWalk.getKeyFrame(animationTimer));
+            enemy.setLinearVelocity(velocity);
         }
     }
 
     @Override
     protected void defineEnemy() {
         BodyDef bodyDef = new BodyDef();
-        bodyDef.position.set(getX() + 0.32f, getY());
+        bodyDef.position.set(getX(), getY());
         bodyDef.type = BodyDef.BodyType.DynamicBody;
 
         CircleShape circleShape = new CircleShape();
@@ -68,7 +72,7 @@ public class Goomba extends Enemy {
 
         fixtureDef.shape = circleShape;
         enemy = world.createBody(bodyDef);
-        enemy.createFixture(fixtureDef);
+        enemy.createFixture(fixtureDef).setUserData(this);
 
         //create the head
         PolygonShape head = new PolygonShape();
@@ -85,8 +89,15 @@ public class Goomba extends Enemy {
         enemy.createFixture(fixtureDef).setUserData(this);
     }
 
+    public void draw(SpriteBatch spriteBatch){
+        if(!destroyed || animationTimer < 1){
+            super.draw(spriteBatch);
+        }
+    }
+
     @Override
     public void hitOnHead(){
+        MarioBros.assetManager.get("audio/sounds/stomp.wav", Sound.class).play();
         setToDestroy = true;
     }
 }

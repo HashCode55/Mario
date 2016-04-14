@@ -1,5 +1,6 @@
 package com.spacetime.mario.sprites;
 
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -18,26 +19,38 @@ import com.spacetime.mario.screens.PlayScreen;
  * Created by mehul on 4/14/16.
  */
 public class Mario extends Sprite {
-    public enum State{FALLING, JUMPING, RUNNING, STANDING};
+    public enum State{FALLING, JUMPING, RUNNING, STANDING, GROWING};
     public State currentState;
     public State previousState;
     private World world;
     public Body mario;
     //the texture region that represents mario standing.
     private TextureRegion marioStand;
-
     private Animation marioRun;
-    private Animation marioJump;
+    private TextureRegion marioJump;
+
+    private TextureRegion bigMarioStand;
+    private TextureRegion bigMarioJump;
+    private Animation bigMarioRun;
+    private Animation growMario;
+
+    private boolean marioIsBig;
+    private boolean runGrowAnimation;
 
     private boolean runningRight;
     private float animationTimer;
 
+    private boolean timeToDefineBigMario;
+    private boolean timeToReDefineMario;
+
     public Mario(PlayScreen playScreen){
-        super(playScreen.getTextureAtlas().findRegion("little_mario"));
         this.world = playScreen.getWorld();
         defineMario();
-        //get texture from the sprite.
-        marioStand = new TextureRegion(getTexture(), 0, 10, 16, 16 );
+
+        //get texture from the sprite, create textures for mario standing....
+        marioStand = new TextureRegion(playScreen.getTextureAtlas().findRegion("little_mario"), 0, 0, 16, 16 );
+        bigMarioStand = new TextureRegion(playScreen.getTextureAtlas().findRegion("big_mario"), 0, 0, 16, 32);
+
         setBounds(0, 10, 16 / MarioBros.PPM, 16 / MarioBros.PPM);
         setRegion(marioStand);
 
@@ -45,42 +58,75 @@ public class Mario extends Sprite {
         previousState = State.STANDING;
 
         animationTimer = 0;
-
         runningRight = true;
 
+        //for mario running
         Array<TextureRegion> frames = new Array<TextureRegion>();
         for(int i = 1; i < 4; i++){
-            frames.add(new TextureRegion(getTexture(), i * 16, 10, 16, 16));
+            frames.add(new TextureRegion(playScreen.getTextureAtlas().findRegion("little_mario"), i * 16, 0, 16, 16));
         }
         marioRun = new Animation(0.1f, frames);
-        frames.clear();
-        //initialise animations
 
-        for(int i = 4; i < 6; i++){
-            frames.add(new TextureRegion(getTexture(), i * 16, 10, 16, 16));
+        frames.clear();
+
+        for(int i = 1; i < 4; i++){
+            frames.add(new TextureRegion(playScreen.getTextureAtlas().findRegion("big_mario"), i * 16, 0, 16, 32));
         }
-        marioJump = new Animation(0.1f, frames);
+        bigMarioRun = new Animation(0.1f, frames);
+        frames.clear();
+
+        //for growing the mario
+        frames.add(new TextureRegion(playScreen.getTextureAtlas().findRegion("big_mario"), 240, 0, 16, 32));
+        frames.add(new TextureRegion(playScreen.getTextureAtlas().findRegion("big_mario"), 0, 0, 16, 32));
+        frames.add(new TextureRegion(playScreen.getTextureAtlas().findRegion("big_mario"), 240, 0, 16, 32));
+        frames.add(new TextureRegion(playScreen.getTextureAtlas().findRegion("big_mario"), 0, 0, 16, 32));
+        growMario = new Animation(0.2f, frames);
+
+        //for mario jump
+        marioJump = new TextureRegion(playScreen.getTextureAtlas().findRegion("little_mario"), 80, 0, 16, 16);
+        bigMarioJump = new TextureRegion(playScreen.getTextureAtlas().findRegion("big_mario"), 80, 0, 16, 32);
+
     }
 
     public void update(float delta){
-        setPosition(mario.getPosition().x - getWidth() / 2, mario.getPosition().y - getHeight() / 2);
+        if(marioIsBig)
+            setPosition(mario.getPosition().x - getWidth() / 2, mario.getPosition().y - getHeight() / 2 - 6 / MarioBros.PPM);
+        else
+            setPosition(mario.getPosition().x - getWidth() / 2, mario.getPosition().y - getHeight() / 2);
         setRegion(getFrame(delta));
+        if(timeToDefineBigMario)
+            defineBigMario();
+        if(timeToReDefineMario)
+            reDefineMario();
+    }
+
+    public void grow(){
+        runGrowAnimation = true;
+        marioIsBig = true;
+        timeToDefineBigMario = true;
+        MarioBros.assetManager.get("audio/sounds/powerup.wav", Sound.class).play();
+        setBounds(getX(), getY(), getWidth(), getHeight() * 2);
     }
 
     private TextureRegion getFrame(float delta){
         currentState = getState();
         TextureRegion region;
         switch (currentState){
+            case GROWING:
+                region = growMario.getKeyFrame(animationTimer);
+                if(growMario.isAnimationFinished(animationTimer))
+                    runGrowAnimation = false;
+                break;
             case JUMPING:
-                region = marioJump.getKeyFrame(animationTimer);
+                region = marioIsBig ? bigMarioJump : marioJump;
                 break;
             case RUNNING:
-                region = marioRun.getKeyFrame(animationTimer, true);
+                region = marioIsBig ? bigMarioRun.getKeyFrame(animationTimer, true) : marioRun.getKeyFrame(animationTimer, true);
                 break;
             case FALLING:
             case STANDING:
             default:
-                region = marioStand;
+                region = marioIsBig ? bigMarioStand : marioStand;
                 break;
         }
         //flip the mario
@@ -99,7 +145,9 @@ public class Mario extends Sprite {
     }
 
     private State getState(){
-        if(mario.getLinearVelocity().y > 0 || (mario.getLinearVelocity().y < 0 && previousState == State.JUMPING))
+        if(runGrowAnimation)
+            return State.GROWING;
+        else if(mario.getLinearVelocity().y > 0 || (mario.getLinearVelocity().y < 0 && previousState == State.JUMPING))
             return State.JUMPING;
         else if(mario.getLinearVelocity().y < 0)
             return State.FALLING;
@@ -122,16 +170,101 @@ public class Mario extends Sprite {
         fixtureDef.filter.maskBits = MarioBros.GROUND_BIT | MarioBros.COIN_BIT | MarioBros.BRICK_BIT
                                                             |MarioBros.OBJECT_BIT
                                                             |MarioBros.ENEMY_BIT
-                                                            |MarioBros.ENEMY_HEAD_BIT;
+                                                            |MarioBros.ENEMY_HEAD_BIT
+                                                            |MarioBros.ITEM_BIT;
 
         fixtureDef.shape = circleShape;
         mario = world.createBody(bodyDef);
-        mario.createFixture(fixtureDef);
+        mario.createFixture(fixtureDef).setUserData(this);
 
         EdgeShape head = new EdgeShape();
         head.set(new Vector2(-2 / MarioBros.PPM, 6 / MarioBros.PPM), new Vector2( 2 / MarioBros.PPM, 6 / MarioBros.PPM));
+        fixtureDef.filter.categoryBits = MarioBros.MARIO_HEAD_BIT;
         fixtureDef.shape = head;
-        mario.createFixture(fixtureDef).setUserData("head");
+        mario.createFixture(fixtureDef).setUserData(this);
         fixtureDef.isSensor = true;
+    }
+
+    private void defineBigMario(){
+
+        Vector2 currentPos = mario.getPosition();
+        world.destroyBody(mario);
+        //we can add more than one fixtures in a body
+        BodyDef bodyDef = new BodyDef();
+        bodyDef.position.set(currentPos.add(0, 10 / MarioBros.PPM));
+        bodyDef.type = BodyDef.BodyType.DynamicBody;
+
+        CircleShape circleShape = new CircleShape();
+        circleShape.setRadius(6 / MarioBros.PPM);
+
+        FixtureDef fixtureDef = new FixtureDef();
+        fixtureDef.filter.categoryBits = MarioBros.MARIO_BIT;
+        fixtureDef.filter.maskBits = MarioBros.GROUND_BIT | MarioBros.COIN_BIT | MarioBros.BRICK_BIT
+                |MarioBros.OBJECT_BIT
+                |MarioBros.ENEMY_BIT
+                |MarioBros.ENEMY_HEAD_BIT
+                |MarioBros.ITEM_BIT;
+
+        fixtureDef.shape = circleShape;
+        mario = world.createBody(bodyDef);
+        mario.createFixture(fixtureDef).setUserData(this);
+        circleShape.setPosition(new Vector2(0, -14 / MarioBros.PPM));
+        mario.createFixture(fixtureDef).setUserData(this);
+
+        EdgeShape head = new EdgeShape();
+        head.set(new Vector2(-2 / MarioBros.PPM, 6 / MarioBros.PPM), new Vector2( 2 / MarioBros.PPM, 6 / MarioBros.PPM));
+        fixtureDef.filter.categoryBits = MarioBros.MARIO_HEAD_BIT;
+        fixtureDef.shape = head;
+        mario.createFixture(fixtureDef).setUserData(this);
+        fixtureDef.isSensor = true;
+        timeToDefineBigMario = false;
+    }
+
+    public void reDefineMario(){
+        //we can add more than one fixtures in a body
+        Vector2 pos = mario.getPosition();
+        world.destroyBody(mario);
+        BodyDef bodyDef = new BodyDef();
+        bodyDef.position.set(pos);
+        bodyDef.type = BodyDef.BodyType.DynamicBody;
+
+        CircleShape circleShape = new CircleShape();
+        circleShape.setRadius(6 / MarioBros.PPM);
+
+        FixtureDef fixtureDef = new FixtureDef();
+        fixtureDef.filter.categoryBits = MarioBros.MARIO_BIT;
+        fixtureDef.filter.maskBits = MarioBros.GROUND_BIT | MarioBros.COIN_BIT | MarioBros.BRICK_BIT
+                |MarioBros.OBJECT_BIT
+                |MarioBros.ENEMY_BIT
+                |MarioBros.ENEMY_HEAD_BIT
+                |MarioBros.ITEM_BIT;
+
+        fixtureDef.shape = circleShape;
+        mario = world.createBody(bodyDef);
+        mario.createFixture(fixtureDef).setUserData(this);
+
+        EdgeShape head = new EdgeShape();
+        head.set(new Vector2(-2 / MarioBros.PPM, 6 / MarioBros.PPM), new Vector2( 2 / MarioBros.PPM, 6 / MarioBros.PPM));
+        fixtureDef.filter.categoryBits = MarioBros.MARIO_HEAD_BIT;
+        fixtureDef.shape = head;
+        mario.createFixture(fixtureDef).setUserData(this);
+        fixtureDef.isSensor = true;
+        timeToReDefineMario = false;
+    }
+
+    public void hit(){
+        if(isBig()){
+            marioIsBig = false;
+            timeToReDefineMario = true;
+            setBounds(getX(), getY(), getWidth(), getHeight() / 2);
+            MarioBros.assetManager.get("audio/sounds/powerdown.wav", Sound.class).play();
+        }
+        else {
+            MarioBros.assetManager.load("audio/sounds/powerdown.wav", Sound.class);
+        }
+    }
+
+    public boolean isBig(){
+        return marioIsBig;
     }
 }

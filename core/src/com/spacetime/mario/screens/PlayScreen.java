@@ -8,27 +8,27 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
-import com.badlogic.gdx.maps.MapObject;
-import com.badlogic.gdx.maps.objects.RectangleMapObject;
 import com.badlogic.gdx.maps.tiled.TiledMap;
 import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
-import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.physics.box2d.Body;
-import com.badlogic.gdx.physics.box2d.BodyDef;
 import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
-import com.badlogic.gdx.physics.box2d.FixtureDef;
-import com.badlogic.gdx.physics.box2d.PolygonShape;
 import com.badlogic.gdx.physics.box2d.World;
+import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.spacetime.mario.MarioBros;
+import com.spacetime.mario.items.Item;
+import com.spacetime.mario.items.ItemDef;
+import com.spacetime.mario.items.Mushroom;
 import com.spacetime.mario.scenes.Hud;
-import com.spacetime.mario.sprites.Goomba;
+import com.spacetime.mario.enemies.Enemy;
 import com.spacetime.mario.sprites.Mario;
 import com.spacetime.mario.tools.Box2DWorldCreator;
 import com.spacetime.mario.tools.WorldContactListener;
+
+import java.util.PriorityQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * Created by mehul on 4/13/16.
@@ -54,9 +54,10 @@ public class PlayScreen extends ScreenAdapter{
     private Box2DWorldCreator box2DWorldCreator;
 
     //enemies
-    private Goomba goomba;
     private Music music;
 
+    private Array<Item> items;
+    private LinkedBlockingQueue<ItemDef> itemsToSpawn;
 
     public PlayScreen(MarioBros game){
         this.game = game;
@@ -81,8 +82,23 @@ public class PlayScreen extends ScreenAdapter{
 
         music = MarioBros.assetManager.get("audio/music/mario_music.ogg", Music.class);
         music.setLooping(true);
+        music.setVolume(0.3f);
         music.play();
-        goomba = new Goomba(this,  0.32f, 0.32f);
+
+        items = new Array<Item>();
+        itemsToSpawn = new LinkedBlockingQueue<ItemDef>();
+    }
+
+    public void spawnItem(ItemDef itemDef){
+        itemsToSpawn.add(itemDef);
+    }
+
+    public void handleSpawningItems(){
+        if(!itemsToSpawn.isEmpty()){
+            ItemDef itemDef = itemsToSpawn.poll();
+            if(itemDef.type == Mushroom.class)
+                items.add(new Mushroom(this, itemDef.position.x, itemDef.position.y));
+        }
     }
 
     public TextureAtlas getTextureAtlas(){
@@ -108,11 +124,20 @@ public class PlayScreen extends ScreenAdapter{
 
     private void update(float delta){
         handleInput(delta);
+        handleSpawningItems();
+        for(Enemy enemy : box2DWorldCreator.getGoombas()){
+            enemy.update(delta);
+            if(enemy.getX() < mario.getX() + 224 / MarioBros.PPM) {
+                enemy.enemy.setActive(true);
+            }
+        }
 
+        for(Item item : items){
+            item.update(delta);
+        }
         world.step(delta, 6, 2);
         hud.update(delta);
         mario.update(delta);
-        goomba.update(delta);
         if(mario.mario.getPosition().x > viewport.getWorldWidth() / 2)
             camera.position.x = mario.mario.getPosition().x;
         camera.update();
@@ -139,7 +164,12 @@ public class PlayScreen extends ScreenAdapter{
         game.batch.setProjectionMatrix(camera.combined);
         game.batch.begin();
         mario.draw(game.batch);
-        goomba.draw(game.batch);
+        for(Enemy enemy : box2DWorldCreator.getGoombas()){
+            enemy.draw(game.batch);
+        }
+        for(Item item : items){
+            item.draw(game.batch);
+        }
         game.batch.end();
         game.batch.setProjectionMatrix(hud.stage.getCamera().combined);
         hud.stage.draw();

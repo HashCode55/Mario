@@ -1,5 +1,7 @@
 package com.spacetime.mario.sprites;
 
+import com.badlogic.gdx.maps.MapObject;
+import com.badlogic.gdx.maps.objects.RectangleMapObject;
 import com.badlogic.gdx.maps.tiled.TiledMap;
 import com.badlogic.gdx.maps.tiled.TiledMapTile;
 import com.badlogic.gdx.maps.tiled.TiledMapTileLayer;
@@ -23,11 +25,15 @@ public abstract class InteractiveTileObject {
     protected TiledMapTile tiledMapTile;
     protected Rectangle bounds;
     protected Body body;
-    protected  Fixture fixture;
-    public InteractiveTileObject(PlayScreen screen, Rectangle bounds){
+    protected Fixture fixture;
+    protected PlayScreen screen;
+    protected MapObject mapObject;
+    public InteractiveTileObject(PlayScreen screen, MapObject mapObject){
+        this.mapObject = mapObject;
+        this.screen = screen;
         this.world = screen.getWorld();
         this.tiledMap = screen.getTiledMap();
-        this.bounds = bounds;
+        this.bounds = ((RectangleMapObject)mapObject).getRectangle();
 
         BodyDef bodyDef = new BodyDef();
         bodyDef.type = BodyDef.BodyType.StaticBody;
@@ -41,7 +47,7 @@ public abstract class InteractiveTileObject {
 
     }
 
-    public abstract void onHeadHit();
+    public abstract void onHeadHit(Mario mario);
 
     public void setCategoryFilter(Short filterBit){
         Filter filter = new Filter();
