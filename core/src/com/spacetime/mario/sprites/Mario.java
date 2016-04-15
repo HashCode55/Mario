@@ -1,5 +1,6 @@
 package com.spacetime.mario.sprites;
 
+import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.Sprite;
@@ -9,17 +10,21 @@ import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
 import com.badlogic.gdx.physics.box2d.CircleShape;
 import com.badlogic.gdx.physics.box2d.EdgeShape;
+import com.badlogic.gdx.physics.box2d.Filter;
+import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.FixtureDef;
 import com.badlogic.gdx.physics.box2d.World;
 import com.badlogic.gdx.utils.Array;
 import com.spacetime.mario.MarioBros;
+import com.spacetime.mario.enemies.Enemy;
+import com.spacetime.mario.enemies.Turtle;
 import com.spacetime.mario.screens.PlayScreen;
 
 /**
  * Created by mehul on 4/14/16.
  */
 public class Mario extends Sprite {
-    public enum State{FALLING, JUMPING, RUNNING, STANDING, GROWING};
+    public enum State{FALLING, JUMPING, RUNNING, STANDING, GROWING, DEAD};
     public State currentState;
     public State previousState;
     private World world;
@@ -33,6 +38,7 @@ public class Mario extends Sprite {
     private TextureRegion bigMarioJump;
     private Animation bigMarioRun;
     private Animation growMario;
+    private TextureRegion marioDead;
 
     private boolean marioIsBig;
     private boolean runGrowAnimation;
@@ -42,6 +48,7 @@ public class Mario extends Sprite {
 
     private boolean timeToDefineBigMario;
     private boolean timeToReDefineMario;
+    private boolean isMarioDead;
 
     public Mario(PlayScreen playScreen){
         this.world = playScreen.getWorld();
@@ -50,6 +57,8 @@ public class Mario extends Sprite {
         //get texture from the sprite, create textures for mario standing....
         marioStand = new TextureRegion(playScreen.getTextureAtlas().findRegion("little_mario"), 0, 0, 16, 16 );
         bigMarioStand = new TextureRegion(playScreen.getTextureAtlas().findRegion("big_mario"), 0, 0, 16, 32);
+
+        marioDead = new TextureRegion(playScreen.getTextureAtlas().findRegion("little_mario"), 96, 0, 16, 16);
 
         setBounds(0, 10, 16 / MarioBros.PPM, 16 / MarioBros.PPM);
         setRegion(marioStand);
@@ -112,6 +121,9 @@ public class Mario extends Sprite {
         currentState = getState();
         TextureRegion region;
         switch (currentState){
+            case DEAD:
+                region = marioDead;
+                break;
             case GROWING:
                 region = growMario.getKeyFrame(animationTimer);
                 if(growMario.isAnimationFinished(animationTimer))
@@ -139,7 +151,7 @@ public class Mario extends Sprite {
             runningRight = true;
         }
         //if prev state is not equal to current state restart the timer.
-        animationTimer = currentState == previousState ? animationTimer += delta : 0;
+        animationTimer = currentState == previousState ? animationTimer + delta : 0;
         previousState = currentState;
         return region;
     }
@@ -147,6 +159,8 @@ public class Mario extends Sprite {
     private State getState(){
         if(runGrowAnimation)
             return State.GROWING;
+        else if(isMarioDead)
+            return State.DEAD;
         else if(mario.getLinearVelocity().y > 0 || (mario.getLinearVelocity().y < 0 && previousState == State.JUMPING))
             return State.JUMPING;
         else if(mario.getLinearVelocity().y < 0)
@@ -252,19 +266,38 @@ public class Mario extends Sprite {
         timeToReDefineMario = false;
     }
 
-    public void hit(){
-        if(isBig()){
-            marioIsBig = false;
-            timeToReDefineMario = true;
-            setBounds(getX(), getY(), getWidth(), getHeight() / 2);
-            MarioBros.assetManager.get("audio/sounds/powerdown.wav", Sound.class).play();
-        }
-        else {
-            MarioBros.assetManager.load("audio/sounds/powerdown.wav", Sound.class);
+    public void hit(Enemy enemy){
+        if(enemy instanceof Turtle && ((Turtle)enemy).getCurrentState() == Turtle.State.STANDING_SHELL){
+            ((Turtle)enemy).kick(this.getX() <= enemy.getX() ? Turtle.KICK_RIGHT_SPEED : Turtle.KICK_LEFT_SPEED);
+        } else {
+            if (isBig()) {
+                marioIsBig = false;
+                timeToReDefineMario = true;
+                setBounds(getX(), getY(), getWidth(), getHeight() / 2);
+                MarioBros.assetManager.get("audio/sounds/powerdown.wav", Sound.class).play();
+            } else {
+                MarioBros.assetManager.get("audio/music/mario_music.ogg", Music.class).stop();
+                MarioBros.assetManager.get("audio/sounds/mariodie.wav", Sound.class).play();
+                isMarioDead = true;
+                Filter filter = new Filter();
+                filter.maskBits = MarioBros.NOTHING_BIT;
+                for (Fixture fixture : mario.getFixtureList()) {
+                    fixture.setFilterData(filter);
+                }
+                mario.applyLinearImpulse(new Vector2(0, 4f), mario.getWorldCenter(), true);
+            }
         }
     }
 
     public boolean isBig(){
         return marioIsBig;
+    }
+
+    public boolean isDead(){
+        return isMarioDead;
+    }
+
+    public float getStateTimer(){
+        return animationTimer;
     }
 }

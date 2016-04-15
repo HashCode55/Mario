@@ -125,7 +125,7 @@ public class PlayScreen extends ScreenAdapter{
     private void update(float delta){
         handleInput(delta);
         handleSpawningItems();
-        for(Enemy enemy : box2DWorldCreator.getGoombas()){
+        for(Enemy enemy : box2DWorldCreator.getEnemies()){
             enemy.update(delta);
             if(enemy.getX() < mario.getX() + 224 / MarioBros.PPM) {
                 enemy.enemy.setActive(true);
@@ -138,19 +138,21 @@ public class PlayScreen extends ScreenAdapter{
         world.step(delta, 6, 2);
         hud.update(delta);
         mario.update(delta);
-        if(mario.mario.getPosition().x > viewport.getWorldWidth() / 2)
+        if(mario.mario.getPosition().x > viewport.getWorldWidth() / 2 && mario.currentState != Mario.State.DEAD)
             camera.position.x = mario.mario.getPosition().x;
         camera.update();
         orthogonalTiledMapRenderer.setView(camera);
     }
 
     private void handleInput(float delta){
-        if(Gdx.input.isKeyJustPressed(Input.Keys.UP))
-            mario.mario.applyLinearImpulse(new Vector2(0, 4f), mario.mario.getWorldCenter(), true);
-        if(Gdx.input.isKeyPressed(Input.Keys.RIGHT) && mario.mario.getLinearVelocity().x <= 2)
-            mario.mario.applyLinearImpulse(new Vector2(0.1f, 0), mario.mario.getWorldCenter(), true);
-        if(Gdx.input.isKeyPressed(Input.Keys.LEFT) && mario.mario.getLinearVelocity().x >= -2)
-            mario.mario.applyLinearImpulse(new Vector2(-0.1f, 0), mario.mario.getWorldCenter(), true);
+        if(mario.currentState != Mario.State.DEAD) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.UP))
+                mario.mario.applyLinearImpulse(new Vector2(0, 4f), mario.mario.getWorldCenter(), true);
+            if (Gdx.input.isKeyPressed(Input.Keys.RIGHT) && mario.mario.getLinearVelocity().x <= 2)
+                mario.mario.applyLinearImpulse(new Vector2(0.1f, 0), mario.mario.getWorldCenter(), true);
+            if (Gdx.input.isKeyPressed(Input.Keys.LEFT) && mario.mario.getLinearVelocity().x >= -2)
+                mario.mario.applyLinearImpulse(new Vector2(-0.1f, 0), mario.mario.getWorldCenter(), true);
+        }
     }
 
     private void clearScreen(){
@@ -164,7 +166,7 @@ public class PlayScreen extends ScreenAdapter{
         game.batch.setProjectionMatrix(camera.combined);
         game.batch.begin();
         mario.draw(game.batch);
-        for(Enemy enemy : box2DWorldCreator.getGoombas()){
+        for(Enemy enemy : box2DWorldCreator.getEnemies()){
             enemy.draw(game.batch);
         }
         for(Item item : items){
@@ -173,10 +175,16 @@ public class PlayScreen extends ScreenAdapter{
         game.batch.end();
         game.batch.setProjectionMatrix(hud.stage.getCamera().combined);
         hud.stage.draw();
+
+
     }
 
     private void drawDebug(){
         debugRenderer.render(world, camera.combined);
+        if(isGameOver()){
+            game.setScreen(new GameOverScreen(game));
+            dispose();
+        }
     }
 
     @Override
@@ -198,5 +206,12 @@ public class PlayScreen extends ScreenAdapter{
     public void resize(int width, int height) {
         super.resize(width, height);
         viewport.update(width, height);
+    }
+
+    public boolean isGameOver(){
+        if(mario.isDead() && mario.getStateTimer() > 3){
+            return true;
+        }
+        return false;
     }
 }

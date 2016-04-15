@@ -39,9 +39,9 @@ public class WorldContactListener implements ContactListener {
                 break;
             case MarioBros.MARIO_BIT | MarioBros.ENEMY_HEAD_BIT:
                 if(fixtureA.getFilterData().categoryBits == MarioBros.ENEMY_HEAD_BIT)
-                    ((Enemy)fixtureA.getUserData()).hitOnHead();
+                    ((Enemy)fixtureA.getUserData()).hitOnHead((Mario)(fixtureB.getUserData()));
                 else if(fixtureB.getFilterData().categoryBits == MarioBros.ENEMY_HEAD_BIT)
-                    ((Enemy)fixtureB.getUserData()).hitOnHead();
+                    ((Enemy)fixtureB.getUserData()).hitOnHead((Mario)(fixtureA.getUserData()));
                 break;
 
             case MarioBros.ENEMY_BIT | MarioBros.OBJECT_BIT:
@@ -52,13 +52,13 @@ public class WorldContactListener implements ContactListener {
                 break;
             case MarioBros.MARIO_BIT | MarioBros.ENEMY_BIT:
                 if(fixtureA.getFilterData().categoryBits == MarioBros.MARIO_BIT)
-                    ((Mario)fixtureA.getUserData()).hit();
+                    ((Mario)fixtureA.getUserData()).hit((Enemy)fixtureB.getUserData());
                 else
-                    ((Mario)fixtureB.getUserData()).hit();
+                    ((Mario)fixtureB.getUserData()).hit((Enemy)fixtureA.getUserData());
                 break;
             case MarioBros.ENEMY_BIT | MarioBros.ENEMY_BIT:
-                ((Enemy)fixtureB.getUserData()).reverseVelocity(true, false);
-                ((Enemy)fixtureA.getUserData()).reverseVelocity(true, false);
+                ((Enemy)fixtureB.getUserData()).onEnemyHit(((Enemy)fixtureA.getUserData()));
+                ((Enemy)fixtureA.getUserData()).onEnemyHit(((Enemy)fixtureB.getUserData()));
                 break;
             case MarioBros.ITEM_BIT | MarioBros.OBJECT_BIT:
                 if(fixtureA.getFilterData().categoryBits == MarioBros.ITEM_BIT)
